@@ -1,0 +1,32 @@
+function validarDatasTabelaFilha() {
+    var valido = true;
+
+    $("input[name^='dataInicio___']").each(function () {
+        var id = $(this).attr("name").split("___")[1]; // índice da linha
+        var dataInicioStr = $(`input[name='dataInicio___${id}']`).val();
+        var dataFimStr = $(`input[name='dataFim___${id}']`).val();
+
+        if (dataInicioStr && dataFimStr) {
+            var dtInicio = stringToDate(dataInicioStr);
+            var dtFim = stringToDate(dataFimStr);
+
+            if (dtFim < dtInicio) {
+                valido = false;
+
+                FLUIGC.toast({
+                    title: 'Erro: ',
+                    message: `Na linha ${id}, a Data Fim não pode ser menor que a Data Início.`,
+                    type: 'danger'
+                });
+            }
+        }
+    });
+
+    return valido;
+}
+
+// Converte 'dd/mm/yyyy' para objeto Date
+function stringToDate(str) {
+    var parts = str.split("/");
+    return new Date(parts[2], parts[1] - 1, parts[0]); // ano, mês (0-based), dia
+}
