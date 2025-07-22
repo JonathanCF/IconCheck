@@ -1,0 +1,33 @@
+$(document).ready(function () {
+    verificarCamposTabela();
+
+    // Oculta botão "Enviar" padrão do Fluig se necessário
+    verificarCamposTabela(); // chama na carga
+});
+
+function verificarCamposTabela() {
+    var camposPreenchidos = true;
+
+    $("input[name^='dataInicio___']").each(function () {
+        var id = $(this).attr("name").split("___")[1];
+        var dataInicio = $(`input[name='dataInicio___${id}']`).val();
+        var dataFim = $(`input[name='dataFim___${id}']`).val();
+
+        if (!dataInicio || !dataFim) {
+            camposPreenchidos = false;
+        }
+    });
+
+    // Esconde ou mostra o botão pelo texto
+    setTimeout(function () {
+        $("button").each(function () {
+            if ($(this).text().trim() === "Enviar") {
+                if (camposPreenchidos) {
+                    $(this).show();
+                } else {
+                    $(this).hide();
+                }
+            }
+        });
+    }, 300); // pequeno delay para garantir que o botão foi renderizado
+}
