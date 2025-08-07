@@ -1,0 +1,153 @@
+function servicetask394(attempt, message) {
+    var company = getValue('WKCompany');
+    var campos = hAPI.getCardData(getValue('WKNumProces'));
+    var contador = campos.keySet().iterator();
+
+    // Primeiro, conta quantos produtos com código '0059' existem
+    var totalProdutos0059 = 0;
+    var produtos0059 = [];
+
+    var tempContador = campos.keySet().iterator();
+    while (tempContador.hasNext()) {
+        var id = tempContador.next();
+        if (id.match(/grid_prod_cod___/)) {
+            var seq = id.split("___")[1];
+            var grid_prod_cod = campos.get("grid_prod_cod___" + seq).trim();
+            if (grid_prod_cod.indexOf('0059') != -1) {
+                totalProdutos0059++;
+                produtos0059.push(seq);
+            }
+        }
+    }
+
+    log.info("Total de produtos com código iniciando em '0059' para integração: " + totalProdutos0059);
+
+    // Agora processa os produtos um a um
+    for (var i = 0; i < produtos0059.length; i++) {
+        var seq = produtos0059[i];
+
+        var grid_prod_cod = campos.get("grid_prod_cod___" + seq).trim();
+        var grid_prod_desc = campos.get("grid_prod_desc___" + seq);
+        var grid_prod_versao = campos.get("grid_prod_versao___" + seq);
+        var grid_prod_renov = campos.get("grid_prod_renov___" + seq);
+        var grid_prod_admin = campos.get("grid_prod_admin___" + seq);
+        var grid_prod_status = campos.get("grid_prod_status___" + seq);
+        var expense_description = campos.get("expense_description___" + seq);
+
+        var qtd_projetos = 0;
+        var projetos = [];
+
+        // Novo iterador para os projetos (sem afetar o loop externo)
+        var contadorProjetos = campos.keySet().iterator();
+        while (contadorProjetos.hasNext()) {
+            var idProjeto = contadorProjetos.next();
+            if (idProjeto.match(/grid_proj_prod___/)) {
+                var seqProj = idProjeto.split("___")[1];
+                var grid_proj_prod = campos.get("grid_proj_prod___" + seqProj).trim();
+                var grid_proj_cod = campos.get("grid_proj_cod___" + seqProj).trim();
+                var grid_proj_descricao = campos.get("grid_proj_descricao___" + seqProj).trim();
+
+                if (grid_prod_cod == grid_proj_prod) {
+                    qtd_projetos++;
+                    projetos.push({
+                        'grid_proj_cod': grid_proj_cod,
+                        'grid_proj_descricao': grid_proj_descricao
+                    });
+                }
+            }
+        }
+
+        var clientService = fluigAPI.getAuthorizeClientService();
+        var params = {
+            "fields": {
+                "project": { "id": "33303" },
+                "summary": hAPI.getCardValue('nm_assunto'),
+                "issuetype": { "id": "15102" },
+                "assignee": { "name": hAPI.getCardValue('nm_aprov_budget').split('@')[0] },
+                "customfield_35701": { "name": hAPI.getCardValue('nm_login') },
+                "customfield_32601": getValue('WKNumProces') + '',
+                "customfield_45506": hAPI.getCardValue('nm_fluig_id_ori') + '',
+                "customfield_35518": hAPI.getCardValue('txt_numero_contrato'),
+                "customfield_39573": { "value": "1" },
+                "customfield_39574": grid_prod_desc,
+                "customfield_35613": grid_prod_versao,
+                "customfield_39507": { "value": grid_prod_renov },
+                "customfield_39506": grid_prod_admin,
+                "customfield_35617": { "value": grid_prod_status },
+                "customfield_39509": { "value": qtd_projetos + "" }
+            }
+        };
+
+        // Mapeamento dos campos de projeto no Jira
+        var licProjetos = [
+            ['customfield_39510', 'customfield_39543'],
+            ['customfield_39511', 'customfield_39544'],
+            ['customfield_39512', 'customfield_39545'],
+            ['customfield_39513', 'customfield_39546'],
+            ['customfield_39514', 'customfield_39547'],
+            ['customfield_39515', 'customfield_39548'],
+            ['customfield_39516', 'customfield_39549'],
+            ['customfield_39517', 'customfield_39550'],
+            ['customfield_39518', 'customfield_39551'],
+            ['customfield_39520', 'customfield_39552'],
+            ['customfield_39521', 'customfield_39553'],
+            ['customfield_39522', 'customfield_39554'],
+            ['customfield_39523', 'customfield_39555'],
+            ['customfield_39525', 'customfield_39556'],
+            ['customfield_39526', 'customfield_39557'],
+            ['customfield_39527', 'customfield_39558'],
+            ['customfield_39528', 'customfield_39559'],
+            ['customfield_39529', 'customfield_39560'],
+            ['customfield_39530', 'customfield_39561'],
+            ['customfield_39532', 'customfield_39562'],
+            ['customfield_39533', 'customfield_39563'],
+            ['customfield_39534', 'customfield_39564'],
+            ['customfield_39535', 'customfield_39565'],
+            ['customfield_39536', 'customfield_39566'],
+            ['customfield_39537', 'customfield_39567'],
+            ['customfield_39538', 'customfield_39568'],
+            ['customfield_39539', 'customfield_39569'],
+            ['customfield_39540', 'customfield_39570'],
+            ['customfield_39541', 'customfield_39571'],
+            ['customfield_39542', 'customfield_39572']
+        ];
+
+        for (var j = 0; j < projetos.length && j < licProjetos.length; j++) {
+            params['fields'][licProjetos[j][0]] = projetos[j]['grid_proj_cod'];
+            params['fields'][licProjetos[j][1]] = projetos[j]['grid_proj_descricao'];
+        }
+
+        var vo = {
+            'companyId': company + '',
+            'serviceCode': 'JIRA',
+            'endpoint': '/rest/api/2/issue',
+            'method': 'post',
+            'timeoutService': '120',
+            'params': params,
+            'options': {
+                'encoding': 'UTF-8',
+                'mediaType': 'application/json'
+            },
+            'headers': {
+                'Content-Type': 'application/json;charset=UTF-8'
+            }
+        };
+
+        try {
+            var result = clientService.invoke(JSONUtil.toJSON(vo));
+
+            if (result.getHttpStatusResult() == "400") {
+                throw "Erro Integração Jira";
+            } else {
+                log.info('Quantidade de License: ' + qtd_projetos);
+                log.info('Integra Jira License Control - endpoint: ' + result.getEndpoint());
+                log.info('Integra Jira License Control - params: ' + result.getParams());
+                log.info('Integra Jira License Control - httpStatusResult - description: ' + result.getHttpStatusResult() + " - " + result.getDescription());
+                log.info('Integra Jira License Control - result: ' + result.getResult());
+            }
+
+        } catch (e) {
+            log.error('Integra Jira License Control - ERROR: ' + e);
+        }
+    }
+}
