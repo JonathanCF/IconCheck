@@ -1,67 +1,55 @@
 function servicetask394(attempt, message) {
     var company = getValue('WKCompany');
-    var campos = hAPI.getCardData(getValue('WKNumProces'));
+    var numProcess = getValue('WKNumProces');
 
-    var totalProdutos0059 = 0;
     var produtos0059 = [];
     var produtosJaProcessados = [];
 
-    // Primeiro, identifica os produtos válidos
-    var tempContador = campos.keySet().iterator();
-    while (tempContador.hasNext()) {
-        var id = tempContador.next();
-        if (id.match(/grid_prod_cod___/)) {
-            var seq = id.split("___")[1];
-            var grid_prod_cod = campos.get("grid_prod_cod___" + seq).trim();
-            if (grid_prod_cod.indexOf('0059') != -1) {
-                produtos0059.push(seq);
-                totalProdutos0059++;
-            }
+    var indexes = hAPI.getChildrenIndexes("grid_prod"); // <<-- nome da tabela pai/filho
+    for (var i = 0; i < indexes.length; i++) {
+        var seq = indexes[i];
+        var codProduto = hAPI.getCardValue("grid_prod_cod___" + seq).trim();
+
+        if (codProduto.startsWith("0059") && produtosJaProcessados.indexOf(codProduto) === -1) {
+            produtos0059.push(seq);
+            produtosJaProcessados.push(codProduto); // evita duplicidade
         }
     }
 
-    log.info("Total de produtos com código iniciando em '0059' para integração (antes de filtrar duplicados): " + totalProdutos0059);
+    log.info("Total de produtos únicos com código iniciado em '0059' para integração: " + produtos0059.length);
 
     for (var i = 0; i < produtos0059.length; i++) {
         var seq = produtos0059[i];
 
-        var grid_prod_cod = campos.get("grid_prod_cod___" + seq).trim();
-        var grid_prod_desc = campos.get("grid_prod_desc___" + seq);
-        var grid_prod_versao = campos.get("grid_prod_versao___" + seq);
-        var grid_prod_renov = campos.get("grid_prod_renov___" + seq);
-        var grid_prod_admin = campos.get("grid_prod_admin___" + seq);
-        var grid_prod_status = campos.get("grid_prod_status___" + seq);
-        var expense_description = campos.get("expense_description___" + seq);
+        var grid_prod_cod = hAPI.getCardValue("grid_prod_cod___" + seq).trim();
+        var grid_prod_desc = hAPI.getCardValue("grid_prod_desc___" + seq);
+        var grid_prod_versao = hAPI.getCardValue("grid_prod_versao___" + seq);
+        var grid_prod_renov = hAPI.getCardValue("grid_prod_renov___" + seq);
+        var grid_prod_admin = hAPI.getCardValue("grid_prod_admin___" + seq);
+        var grid_prod_status = hAPI.getCardValue("grid_prod_status___" + seq);
+        var expense_description = hAPI.getCardValue("expense_description___" + seq);
 
-        // Evita integrar produtos duplicados
-        if (produtosJaProcessados.indexOf(grid_prod_cod) != -1) {
-            log.info("Produto " + grid_prod_cod + " já integrado. Ignorando duplicidade.");
-            continue;
-        }
-        produtosJaProcessados.push(grid_prod_cod);
-
+        // Buscando projetos associados ao produto
         var qtd_projetos = 0;
         var projetos = [];
 
-        var contadorProjetos = campos.keySet().iterator();
-        while (contadorProjetos.hasNext()) {
-            var idProjeto = contadorProjetos.next();
-            if (idProjeto.match(/grid_proj_prod___/)) {
-                var seqProj = idProjeto.split("___")[1];
-                var grid_proj_prod = campos.get("grid_proj_prod___" + seqProj).trim();
-                var grid_proj_cod = campos.get("grid_proj_cod___" + seqProj).trim();
-                var grid_proj_descricao = campos.get("grid_proj_descricao___" + seqProj).trim();
+        var indexesProj = hAPI.getChildrenIndexes("grid_proj"); // <<-- nome da tabela de projetos
+        for (var j = 0; j < indexesProj.length; j++) {
+            var seqProj = indexesProj[j];
+            var grid_proj_prod = hAPI.getCardValue("grid_proj_prod___" + seqProj).trim();
+            var grid_proj_cod = hAPI.getCardValue("grid_proj_cod___" + seqProj).trim();
+            var grid_proj_descricao = hAPI.getCardValue("grid_proj_descricao___" + seqProj).trim();
 
-                if (grid_prod_cod == grid_proj_prod) {
-                    qtd_projetos++;
-                    projetos.push({
-                        'grid_proj_cod': grid_proj_cod,
-                        'grid_proj_descricao': grid_proj_descricao
-                    });
-                }
+            if (grid_prod_cod === grid_proj_prod) {
+                qtd_projetos++;
+                projetos.push({
+                    'grid_proj_cod': grid_proj_cod,
+                    'grid_proj_descricao': grid_proj_descricao
+                });
             }
         }
 
+        // Integração com Jira
         var clientService = fluigAPI.getAuthorizeClientService();
         var params = {
             "fields": {
@@ -70,7 +58,7 @@ function servicetask394(attempt, message) {
                 "issuetype": { "id": "15102" },
                 "assignee": { "name": hAPI.getCardValue('nm_aprov_budget').split('@')[0] },
                 "customfield_35701": { "name": hAPI.getCardValue('nm_login') },
-                "customfield_32601": getValue('WKNumProces') + '',
+                "customfield_32601": numProcess + '',
                 "customfield_45506": hAPI.getCardValue('nm_fluig_id_ori') + '',
                 "customfield_35518": hAPI.getCardValue('txt_numero_contrato'),
                 "customfield_39573": { "value": "1" },
