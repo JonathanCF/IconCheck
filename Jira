@@ -1,12 +1,12 @@
 function servicetask394(attempt, message) {
     var company = getValue('WKCompany');
     var campos = hAPI.getCardData(getValue('WKNumProces'));
-    var contador = campos.keySet().iterator();
 
-    // Primeiro, conta quantos produtos com código '0059' existem
     var totalProdutos0059 = 0;
     var produtos0059 = [];
+    var produtosJaProcessados = [];
 
+    // Primeiro, identifica os produtos válidos
     var tempContador = campos.keySet().iterator();
     while (tempContador.hasNext()) {
         var id = tempContador.next();
@@ -14,15 +14,14 @@ function servicetask394(attempt, message) {
             var seq = id.split("___")[1];
             var grid_prod_cod = campos.get("grid_prod_cod___" + seq).trim();
             if (grid_prod_cod.indexOf('0059') != -1) {
-                totalProdutos0059++;
                 produtos0059.push(seq);
+                totalProdutos0059++;
             }
         }
     }
 
-    log.info("Total de produtos com código iniciando em '0059' para integração: " + totalProdutos0059);
+    log.info("Total de produtos com código iniciando em '0059' para integração (antes de filtrar duplicados): " + totalProdutos0059);
 
-    // Agora processa os produtos um a um
     for (var i = 0; i < produtos0059.length; i++) {
         var seq = produtos0059[i];
 
@@ -34,10 +33,16 @@ function servicetask394(attempt, message) {
         var grid_prod_status = campos.get("grid_prod_status___" + seq);
         var expense_description = campos.get("expense_description___" + seq);
 
+        // Evita integrar produtos duplicados
+        if (produtosJaProcessados.indexOf(grid_prod_cod) != -1) {
+            log.info("Produto " + grid_prod_cod + " já integrado. Ignorando duplicidade.");
+            continue;
+        }
+        produtosJaProcessados.push(grid_prod_cod);
+
         var qtd_projetos = 0;
         var projetos = [];
 
-        // Novo iterador para os projetos (sem afetar o loop externo)
         var contadorProjetos = campos.keySet().iterator();
         while (contadorProjetos.hasNext()) {
             var idProjeto = contadorProjetos.next();
@@ -78,38 +83,22 @@ function servicetask394(attempt, message) {
             }
         };
 
-        // Mapeamento dos campos de projeto no Jira
         var licProjetos = [
-            ['customfield_39510', 'customfield_39543'],
-            ['customfield_39511', 'customfield_39544'],
-            ['customfield_39512', 'customfield_39545'],
-            ['customfield_39513', 'customfield_39546'],
-            ['customfield_39514', 'customfield_39547'],
-            ['customfield_39515', 'customfield_39548'],
-            ['customfield_39516', 'customfield_39549'],
-            ['customfield_39517', 'customfield_39550'],
-            ['customfield_39518', 'customfield_39551'],
-            ['customfield_39520', 'customfield_39552'],
-            ['customfield_39521', 'customfield_39553'],
-            ['customfield_39522', 'customfield_39554'],
-            ['customfield_39523', 'customfield_39555'],
-            ['customfield_39525', 'customfield_39556'],
-            ['customfield_39526', 'customfield_39557'],
-            ['customfield_39527', 'customfield_39558'],
-            ['customfield_39528', 'customfield_39559'],
-            ['customfield_39529', 'customfield_39560'],
-            ['customfield_39530', 'customfield_39561'],
-            ['customfield_39532', 'customfield_39562'],
-            ['customfield_39533', 'customfield_39563'],
-            ['customfield_39534', 'customfield_39564'],
-            ['customfield_39535', 'customfield_39565'],
-            ['customfield_39536', 'customfield_39566'],
-            ['customfield_39537', 'customfield_39567'],
-            ['customfield_39538', 'customfield_39568'],
-            ['customfield_39539', 'customfield_39569'],
-            ['customfield_39540', 'customfield_39570'],
-            ['customfield_39541', 'customfield_39571'],
-            ['customfield_39542', 'customfield_39572']
+            ['customfield_39510', 'customfield_39543'], ['customfield_39511', 'customfield_39544'],
+            ['customfield_39512', 'customfield_39545'], ['customfield_39513', 'customfield_39546'],
+            ['customfield_39514', 'customfield_39547'], ['customfield_39515', 'customfield_39548'],
+            ['customfield_39516', 'customfield_39549'], ['customfield_39517', 'customfield_39550'],
+            ['customfield_39518', 'customfield_39551'], ['customfield_39520', 'customfield_39552'],
+            ['customfield_39521', 'customfield_39553'], ['customfield_39522', 'customfield_39554'],
+            ['customfield_39523', 'customfield_39555'], ['customfield_39525', 'customfield_39556'],
+            ['customfield_39526', 'customfield_39557'], ['customfield_39527', 'customfield_39558'],
+            ['customfield_39528', 'customfield_39559'], ['customfield_39529', 'customfield_39560'],
+            ['customfield_39530', 'customfield_39561'], ['customfield_39532', 'customfield_39562'],
+            ['customfield_39533', 'customfield_39563'], ['customfield_39534', 'customfield_39564'],
+            ['customfield_39535', 'customfield_39565'], ['customfield_39536', 'customfield_39566'],
+            ['customfield_39537', 'customfield_39567'], ['customfield_39538', 'customfield_39568'],
+            ['customfield_39539', 'customfield_39569'], ['customfield_39540', 'customfield_39570'],
+            ['customfield_39541', 'customfield_39571'], ['customfield_39542', 'customfield_39572']
         ];
 
         for (var j = 0; j < projetos.length && j < licProjetos.length; j++) {
@@ -135,19 +124,18 @@ function servicetask394(attempt, message) {
 
         try {
             var result = clientService.invoke(JSONUtil.toJSON(vo));
-
             if (result.getHttpStatusResult() == "400") {
                 throw "Erro Integração Jira";
             } else {
-                log.info('Quantidade de License: ' + qtd_projetos);
-                log.info('Integra Jira License Control - endpoint: ' + result.getEndpoint());
-                log.info('Integra Jira License Control - params: ' + result.getParams());
-                log.info('Integra Jira License Control - httpStatusResult - description: ' + result.getHttpStatusResult() + " - " + result.getDescription());
-                log.info('Integra Jira License Control - result: ' + result.getResult());
+                log.info('Produto integrado: ' + grid_prod_cod);
+                log.info('Quantidade de projetos: ' + qtd_projetos);
+                log.info('Integra Jira - endpoint: ' + result.getEndpoint());
+                log.info('Integra Jira - params: ' + result.getParams());
+                log.info('Integra Jira - httpStatus: ' + result.getHttpStatusResult() + " - " + result.getDescription());
+                log.info('Integra Jira - result: ' + result.getResult());
             }
-
         } catch (e) {
-            log.error('Integra Jira License Control - ERROR: ' + e);
+            log.error('Erro na integração com o Jira para o produto ' + grid_prod_cod + ': ' + e);
         }
     }
 }
