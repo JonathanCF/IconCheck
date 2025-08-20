@@ -9,8 +9,9 @@ function isLicense(obj) {
         grid_prod_cod = grid_prod_cod.val() ? grid_prod_cod.val() : grid_prod_cod.text();
 
         if (grid_prod_cod.startsWith('S')) {
-            // Campos da linha
-            const isLicenseTI = currentRow.find('[id^="grid_prod_lic_ti___"]:first').val();
+            const selectLicense = currentRow.find('[id^="grid_prod_lic_ti___"]:first');
+            const oldValue = selectLicense.data('oldValue') || selectLicense.val(); // Guarda valor antigo
+
             const isVersion = currentRow.find('[id^="grid_prod_versao___"]:first');
             const isTypeLicense = currentRow.find('[id^="grid_prod_renov___"]:first');
             const isAcountAdim = currentRow.find('[id^="grid_prod_admin___"]:first');
@@ -18,22 +19,11 @@ function isLicense(obj) {
             const anotherVersion = currentRow.find('[id^="grid_prod_nome_versao___"]:first');
             const otherField = currentRow.find('[id^="grid_prod_admin_outra___"]:first');
 
-            // Função auxiliar para verificar se todos os campos estão vazios
             const campos = [isVersion, isTypeLicense, isAcountAdim, isStatus, anotherVersion, otherField];
             const todosVazios = campos.every(f => !f.val() || f.val().trim() === "");
 
-            // Se isLicenseTI == 0 e todos campos vazios → ocultar e tornar opcional
-            if (isLicenseTI === "0" && todosVazios) {
-                campos.forEach(f => {
-                    f.val("");
-                    f.removeClass("obrig error").addClass("optional")
-                        .closest('div[class^="col"]').addClass("fs-display-none").hide();
-                });
-                return; // Pula para próxima linha
-            }
-
-            // Se isLicenseTI == 0 e houver campos preenchidos → mostrar confirm
-            if (isLicenseTI === "0" && !todosVazios) {
+            if (oldValue === "1" && selectLicense.val() === "0" && !todosVazios) {
+                // Se o usuário mudar de 1 → 0 e há campos preenchidos, pedir confirmação
                 FLUIGC.message.confirm({
                     message: 'Ao alterar este campo, todos os dados da licença preenchida anteriormente serão perdidos.<br><br>Deseja continuar?',
                     title: 'Confirmação',
@@ -41,32 +31,39 @@ function isLicense(obj) {
                     labelNo: 'Cancelar'
                 }, function (result) {
                     if (result) {
-                        // Usuário clicou em "Sim" → limpa campos e oculta
+                        // Sim → limpa campos e esconde
                         campos.forEach(f => {
                             f.val("");
                             f.removeClass("obrig error").addClass("optional")
                                 .closest('div[class^="col"]').addClass("fs-display-none").hide();
                         });
+                        selectLicense.data('oldValue', "0"); // Atualiza valor antigo
                     } else {
-                        // Cancelar → mantém visível
-                        [isVersion, isTypeLicense, isAcountAdim, isStatus].forEach(f => {
-                            f.addClass("obrig").removeClass("optional")
-                                .closest('div[class^="col"]').removeClass("fs-display-none").show();
-                        });
+                        // Cancelar → retorna o select ao valor antigo
+                        selectLicense.val(oldValue);
                     }
                 });
+            } else if (selectLicense.val() === "0" && todosVazios) {
+                // Todos campos vazios → opcional e oculto
+                campos.forEach(f => {
+                    f.val("");
+                    f.removeClass("obrig error").addClass("optional")
+                        .closest('div[class^="col"]').addClass("fs-display-none").hide();
+                });
+                selectLicense.data('oldValue', "0");
             }
 
             // Se isLicenseTI == 1 → campos obrigatórios e visíveis
-            if (isLicenseTI === "1") {
+            if (selectLicense.val() === "1") {
                 [isVersion, isTypeLicense, isAcountAdim, isStatus].forEach(f => {
                     f.addClass("obrig").removeClass("optional")
                         .closest('div[class^="col"]').removeClass("fs-display-none").show();
                 });
+                selectLicense.data('oldValue', "1");
             }
 
-            // Campos extras: "Outra versão" e "Outra conta admin"
-            if (isVersion.val() === 'Outra' && isLicenseTI === '1') {
+            // Campos extras
+            if (isVersion.val() === 'Outra' && selectLicense.val() === '1') {
                 anotherVersion.addClass("obrig").removeClass("optional")
                     .closest('div[class^="col"]').removeClass("fs-display-none").show();
             } else {
@@ -74,7 +71,7 @@ function isLicense(obj) {
                     .closest('div[class^="col"]').addClass("fs-display-none").hide();
             }
 
-            if (isAcountAdim.val() === 'Outra' && isLicenseTI === '1') {
+            if (isAcountAdim.val() === 'Outra' && selectLicense.val() === '1') {
                 otherField.addClass("obrig").removeClass("optional")
                     .closest('div[class^="col"]').removeClass("fs-display-none").show();
             } else {
@@ -82,11 +79,9 @@ function isLicense(obj) {
                     .closest('div[class^="col"]').addClass("fs-display-none").hide();
             }
 
-            // Status sempre visível
             isStatus.closest('div[class^="col"]').show();
 
         } else {
-            // Caso não comece com 'S' → tudo opcional e oculto
             $("#grid_prod_admin___" + idFilho).addClass("optional").removeClass("obrig");
             [currentRow.find('[id^="grid_prod_versao___"]:first'),
              currentRow.find('[id^="grid_prod_nome_versao___"]:first'),
