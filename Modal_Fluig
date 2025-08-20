@@ -1,0 +1,131 @@
+function isLicense(obj) {
+    var componente = $(obj).prev();
+    idFilho = getIdFilho(componente[0].id);
+
+    $('table[tablename="grid_prod"] tr:not(:first)').each(function () {
+        var grid_prod_cod = $(this).find('[id^="grid_prod_TI___"]:first');
+        grid_prod_cod = grid_prod_cod.val() ? grid_prod_cod.val() : grid_prod_cod.text();
+
+        if (grid_prod_cod.startsWith('S')) {
+            // Marcar campos obrigatório
+            $("#grid_prod_admin___" + idFilho).addClass("obrig").removeClass("optional");
+
+            const currentRow = $(this); // Salve a linha atual
+
+            const isLicenseTI = currentRow.find('[id^="grid_prod_lic_ti___"]:first').val();
+
+            const isVersion = currentRow.find('[id^="grid_prod_versao___"]:first');
+            const isTypeLicense = currentRow.find('[id^="grid_prod_renov___"]:first');
+            const isAcountAdim = currentRow.find('[id^="grid_prod_admin___"]:first');
+            const isStatus = currentRow.find('[id^="grid_prod_status___"]:first');
+            const anotherVersion = currentRow.find('[id^="grid_prod_nome_versao___"]:first');
+            const otherField = currentRow.find('[id^="grid_prod_admin_outra___"]:first');
+
+            // Verifica se deve exibir o modal
+            if (isLicenseTI === "0" && (
+                (isVersion.val() && isVersion.val().trim() !== "") ||
+                (isTypeLicense.val() && isTypeLicense.val().trim() !== "") ||
+                (isAcountAdim.val() && isAcountAdim.val().trim() !== "") ||
+                (isStatus.val() && isStatus.val().trim() !== "") ||
+                (anotherVersion.val() && anotherVersion.val().trim() !== "") ||
+                (otherField.val() && otherField.val().trim() !== "")
+            )) {
+
+                FLUIGC.modal({
+                    title: 'Confirmação',
+                    content: '<p>Atenção: ao alterar esse campo, todos os dados da licença preenchida anteriormente serão perdidos.<br><br>Deseja continuar?</p>',
+                    id: 'modalApagarCampos',
+                    actions: [
+                        {
+                            'label': 'Sim',
+                            'classType': 'btn-primary',
+                            'autoClose': true,
+                            'action': function () {
+                                // Limpar valores
+                                isVersion.val("");
+                                isTypeLicense.val("");
+                                isAcountAdim.val("");
+                                isStatus.val("");
+                                anotherVersion.val("");
+                                otherField.val("");
+
+                                // Esconder campos e remover obrigatoriedade
+                                currentRow.find('[id^="grid_prod_versao___"]:first')
+                                    .removeClass("obrig error").addClass("optional")
+                                    .closest('div[class^="col"]').addClass("fs-display-none").hide();
+
+                                currentRow.find('[id^="grid_prod_renov___"]:first')
+                                    .removeClass("obrig error").addClass("optional")
+                                    .closest('div[class^="col"]').addClass("fs-display-none").hide();
+
+                                currentRow.find('[id^="grid_prod_admin___"]:first')
+                                    .removeClass("obrig error").addClass("optional")
+                                    .closest('div[class^="col"]').addClass("fs-display-none").hide();
+
+                                currentRow.find('[id^="grid_prod_status___"]:first')
+                                    .removeClass("obrig error").addClass("optional")
+                                    .closest('div[class^="col"]').addClass("fs-display-none").hide();
+
+                                currentRow.find('[id^="grid_prod_nome_versao___"]:first')
+                                    .removeClass("obrig error").addClass("optional")
+                                    .closest('div[class^="col"]').addClass("fs-display-none").hide();
+
+                                currentRow.find('[id^="grid_prod_admin_outra___"]:first')
+                                    .removeClass("obrig error").addClass("optional")
+                                    .closest('div[class^="col"]').addClass("fs-display-none").hide();
+                            }
+                        },
+                        {
+                            'label': 'Cancelar',
+                            'classType': 'btn-secondary',
+                            'autoClose': true,
+                            'action': function () { /* só fecha */ }
+                        }
+                    ]
+                });
+            }
+
+            // Tornar campos obrigatórios se Licença TI == 1
+            if (isLicenseTI === '1') {
+                [isVersion, isTypeLicense, isAcountAdim, isStatus].forEach(field => {
+                    field.addClass("obrig").removeClass("optional")
+                        .closest('div[class^="col"]').removeClass("fs-display-none").show();
+                });
+            } else {
+                [isVersion, isTypeLicense, isAcountAdim, isStatus].forEach(field => {
+                    field.removeClass("obrig error").addClass("optional")
+                        .closest('div[class^="col"]').addClass("fs-display-none").hide();
+                });
+            }
+
+            // Exibir ou esconder "Nome da versão" e "Outra Conta Admin"
+            if (isVersion.val() === 'Outra' && isLicenseTI === '1') {
+                anotherVersion.addClass("obrig").removeClass("optional")
+                    .closest('div[class^="col"]').removeClass("fs-display-none").show();
+            } else {
+                anotherVersion.removeClass("obrig error").addClass("optional")
+                    .closest('div[class^="col"]').addClass("fs-display-none").hide();
+            }
+
+            if (isAcountAdim.val() === 'Outra' && isLicenseTI === '1') {
+                otherField.addClass("obrig").removeClass("optional")
+                    .closest('div[class^="col"]').removeClass("fs-display-none").show();
+            } else {
+                otherField.removeClass("obrig error").addClass("optional")
+                    .closest('div[class^="col"]').addClass("fs-display-none").hide();
+            }
+
+            currentRow.find('[id^="grid_prod_status___"]:first').closest('div[class^="col"]').show();
+
+        } else {
+            // Caso não comece com 'S', deixar como opcional e esconder
+            $("#grid_prod_admin___" + idFilho).addClass("optional").removeClass("obrig");
+            $(this).find('[id^="grid_prod_versao___"]:first').closest('div[class^="col"]').hide();
+            $(this).find('[id^="grid_prod_nome_versao___"]:first').closest('div[class^="col"]').hide();
+            $(this).find('[id^="grid_prod_renov___"]:first').closest('div[class^="col"]').hide();
+            $(this).find('[id^="grid_prod_admin___"]:first').closest('div[class^="col"]').hide();
+            $(this).find('[id^="grid_prod_admin_outra___"]:first').closest('div[class^="col"]').hide();
+            $(this).find('[id^="grid_prod_status___"]:first').closest('div[class^="col"]').hide();
+        }
+    });
+}
